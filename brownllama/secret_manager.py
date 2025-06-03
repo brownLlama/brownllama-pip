@@ -7,7 +7,8 @@ This module provides a class for interacting with Google Cloud Secret Manager.
 from __future__ import annotations
 
 from google.cloud import secretmanager
-from vnp.logger import get_logger
+
+from brownllama.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -23,8 +23,9 @@ if TYPE_CHECKING:
 from google.api_core.exceptions import GoogleAPIError, ServerError, ServiceUnavailable
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
-from vnp.logger import get_logger
-from vnp.storage import StorageController
+
+from brownllama.logger import get_logger
+from brownllama.storage import StorageController
 
 logger = get_logger(__name__)
 

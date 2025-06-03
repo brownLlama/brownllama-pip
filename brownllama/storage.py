@@ -15,7 +15,8 @@ import pandas as pd
 from google.cloud import storage
 from google.cloud.exceptions import GoogleCloudError, NotFound
 from google.oauth2.service_account import Credentials
-from vnp.logger import get_logger
+
+from brownllama.logger import get_logger
 
 if TYPE_CHECKING:
     from google.oauth2.service_account import Credentials
