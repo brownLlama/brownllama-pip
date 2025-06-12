@@ -238,7 +238,7 @@ class BigQueryController:
         """
         Create a time-partitioned table using the detected schema.
 
-        Creates a partitioned table on import_timestamp field without partition expiration.
+        Creates a partitioned table on ingestion_timestamp field without partition expiration.
         Partitioned filter is not required.
 
         Args:
@@ -255,22 +255,28 @@ class BigQueryController:
             table = self.client.get_table(self.table_ref)
             schema = list(table.schema)
 
-            # Handle import_timestamp field
-            import_timestamp_field = next(
-                (field for field in schema if field.name == "import_timestamp"), None
+            # Handle ingestion_timestamp field
+            ingestion_timestamp_field = next(
+                (field for field in schema if field.name == "ingestion_timestamp"), None
             )
 
-            if not import_timestamp_field:
+            if not ingestion_timestamp_field:
                 schema.append(
                     bigquery.SchemaField(
-                        name="import_timestamp", field_type="TIMESTAMP", mode="NULLABLE"
+                        name="ingestion_timestamp",
+                        field_type="TIMESTAMP",
+                        mode="NULLABLE",
                     )
                 )
-            elif import_timestamp_field.field_type != "TIMESTAMP":
-                schema = [field for field in schema if field.name != "import_timestamp"]
+            elif ingestion_timestamp_field.field_type != "TIMESTAMP":
+                schema = [
+                    field for field in schema if field.name != "ingestion_timestamp"
+                ]
                 schema.append(
                     bigquery.SchemaField(
-                        name="import_timestamp", field_type="TIMESTAMP", mode="NULLABLE"
+                        name="ingestion_timestamp",
+                        field_type="TIMESTAMP",
+                        mode="NULLABLE",
                     )
                 )
 
@@ -293,7 +299,7 @@ class BigQueryController:
             new_table = bigquery.Table(temp_table_ref, schema=schema)
             new_table.time_partitioning = bigquery.TimePartitioning(
                 type_=bigquery.TimePartitioningType.DAY,
-                field="import_timestamp",
+                field="ingestion_timestamp",
                 require_partition_filter=False,  # Partition filter not required
                 expiration_ms=None,  # No expiration
             )
@@ -423,15 +429,15 @@ class BigQueryController:
         ]
 
     @staticmethod
-    def _add_import_timestamp(json_data: dict | list[dict]) -> dict | list[dict]:
+    def _add_ingestion_timestamp(json_data: dict | list[dict]) -> dict | list[dict]:
         """
-        Add import_timestamp field to JSON data in ISO format.
+        Add ingestion_timestamp field to JSON data in ISO format.
 
         Args:
             json_data: Original JSON data (dict or list of dicts)
 
         Returns:
-            Union[dict, list[dict]]: JSON data with import_timestamp added
+            Union[dict, list[dict]]: JSON data with ingestion_timestamp added
 
         Raises:
             TypeError: If json_data is not a dict or list of dicts
@@ -441,10 +447,10 @@ class BigQueryController:
             error_message = f"Expected dict or list, got {type(json_data).__name__}"
             raise TypeError(error_message)
 
-        import_timestamp = datetime.now(UTC).isoformat()
+        ingestion_timestamp = datetime.now(UTC).isoformat()
 
         if isinstance(json_data, dict):
-            json_data["import_timestamp"] = import_timestamp
+            json_data["ingestion_timestamp"] = ingestion_timestamp
             return json_data
 
         if isinstance(json_data, list):
@@ -453,7 +459,7 @@ class BigQueryController:
                 raise TypeError(error_message)
 
             for item in json_data:
-                item["import_timestamp"] = import_timestamp
+                item["ingestion_timestamp"] = ingestion_timestamp
 
         return json_data
 
@@ -493,8 +499,8 @@ class BigQueryController:
                 error_message = f"Invalid write_disposition. Must be one of {', '.join(valid_dispositions)}"
                 raise ValueError(error_message)
 
-            # Add import_timestamp to the data
-            json_data_with_timestamp = BigQueryController._add_import_timestamp(
+            # Add ingestion_timestamp to the data
+            json_data_with_timestamp = BigQueryController._add_ingestion_timestamp(
                 json_data
             )
 
