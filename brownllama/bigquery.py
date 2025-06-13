@@ -582,6 +582,69 @@ class BigQueryController:
             return gcs_uris
 
     @retry_on_transient_error()
+    def export_gcs_files_to_bigquery(
+        self,
+        gcs_uris: str | list[str],
+        write_disposition: str = "WRITE_APPEND",
+        delete_gcs_file: bool = False,
+    ) -> None:
+        """
+        Export files from GCS to BigQuery.
+
+        Args:
+            gcs_uris: GCS URI(s) of the file(s) to load (can be single URI or list)
+            write_disposition: BigQuery write disposition (WRITE_APPEND, WRITE_TRUNCATE, WRITE_EMPTY)
+            delete_gcs_file: Whether to delete the staging file after loading
+
+        Raises:
+            ValueError: For invalid input data or write disposition
+            Exception: For any general errors during the process
+
+        """
+        try:
+            # Validate write disposition
+            valid_dispositions = ["WRITE_APPEND", "WRITE_TRUNCATE", "WRITE_EMPTY"]
+            if write_disposition not in valid_dispositions:
+                error_message = f"Invalid write_disposition. Must be one of {', '.join(valid_dispositions)}"
+                raise ValueError(error_message)
+
+            # Convert single URI to list for uniform processing
+            if isinstance(gcs_uris, str):
+                gcs_uris = [gcs_uris]
+
+            # Check if table exists
+            table_existed = self._table_exists()
+
+            for i, gcs_uri in enumerate(gcs_uris):
+                if not table_existed and i == 0:
+                    # For first file of new table: use schema autodetection
+                    self._create_new_table_with_chunk(gcs_uri, write_disposition)
+                    table_existed = True
+                else:
+                    # For existing tables or subsequent files: use current schema
+                    self._load_data_from_gcs(gcs_uri, write_disposition)
+
+                # Clean up staging file if requested
+                if delete_gcs_file:
+                    self.storage_controller.delete_file(gcs_uri)
+
+            # Log results
+            if gcs_uris:
+                table = self.client.get_table(self.table_ref)
+                logger.info(
+                    f"{'=' * 10} Loaded {len(gcs_uris)} files into {self.table_id} {'=' * 10}"
+                )
+                logger.info(
+                    f"{'=' * 10} Table {self.table_id} now has {table.num_rows} rows {'=' * 10}"
+                )
+
+        except Exception:
+            logger.exception(
+                f"{'=' * 10} Failed to export GCS files to BigQuery. {'=' * 10}"
+            )
+            raise
+
+    @retry_on_transient_error()
     def execute_query(self, query: str) -> list[dict]:
         """
         Execute a SQL query and return results as a list of dictionaries.
