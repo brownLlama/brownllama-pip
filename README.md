@@ -49,7 +49,7 @@ To build and publish the package, follow these steps:
 3.  Publish the package in PyPI
 
     ```bash
-    uv run twine upload --verbose dist/*
+    uvx twine upload --verbose dist/*
     ```
 
     NOTE: PyPI is public and should not be used for sensitive information. Also, you need to setup `~/.pypirc` with your PyPI credentials.
