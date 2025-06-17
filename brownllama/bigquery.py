@@ -189,7 +189,6 @@ class BigQueryController:
             self.storage_controller = StorageController(
                 project_id=self.project_id,
                 bucket_name=self.bucket_name,
-                credentials=self.client._credentials,
             )
 
             logger.info(
@@ -282,16 +281,14 @@ class BigQueryController:
 
             # Generate temporary table name
             temp_suffix_format_str = cast(
-                str, self.config["temp_table_suffix_format"]
-            )  # Type assertion
+                "str", self.config["temp_table_suffix_format"]
+            )
             temp_suffix = temp_suffix or datetime.now(
                 ZoneInfo("Europe/Berlin")
             ).strftime(
                 temp_suffix_format_str,
             )
-            temp_table_prefix_str = cast(
-                str, self.config["temp_table_prefix"]
-            )  # Type assertion
+            temp_table_prefix_str = cast("str", self.config["temp_table_prefix"])
             temp_table_id = f"{self.table_id}_{temp_table_prefix_str}{temp_suffix}"
             temp_table_ref = self.client.dataset(self.dataset_id).table(temp_table_id)
 
@@ -423,7 +420,7 @@ class BigQueryController:
 
         """
         # Use cast to explicitly tell MyPy that chunk_size is an int here
-        chunk_size = cast(int, self.config["chunk_size"])
+        chunk_size = cast("int", self.config["chunk_size"])
         return [
             data_list[i : i + chunk_size] for i in range(0, len(data_list), chunk_size)
         ]
@@ -518,8 +515,7 @@ class BigQueryController:
                 return []
 
             # Check if we need to chunk the data
-            # Use cast to explicitly tell MyPy that chunk_size is an int here
-            chunk_size = cast(int, self.config["chunk_size"])
+            chunk_size = cast("int", self.config["chunk_size"])
             chunks = (
                 self._chunk_data(data_list)
                 if len(data_list) > chunk_size
