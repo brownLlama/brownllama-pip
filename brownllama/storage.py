@@ -211,13 +211,13 @@ class StorageController:
                 temp_file_path = None
                 try:
                     with tempfile.NamedTemporaryFile(
-                        mode="wb", delete=False, encoding=None, suffix=".json"
+                        mode="wb", delete=False, encoding=None
                     ) as temp_file:
                         blob.download_to_file(temp_file)
                         temp_file_path = Path(temp_file.name)
                         temp_files_paths.append(temp_file_path)
 
-                    with open(temp_file_path, encoding="utf-8") as f:
+                    with open(temp_file_path, encoding="utf-16") as f:
                         file_data = json.load(f)
                         all_downloaded_data.append(file_data)
 
