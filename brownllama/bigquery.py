@@ -370,19 +370,10 @@ class BigQueryController:
         )
         load_job.result()
 
-        # Set up partitioning
+        # Set up partitioning on the newly created table
         self._create_partitioned_table()
-
-        # Reload data into partitioned table
-        job_config = bigquery.LoadJobConfig(
-            source_format="NEWLINE_DELIMITED_JSON",
-            write_disposition=write_disposition,
-            schema=self.client.get_table(self.table_ref).schema,
-        )
-        load_job = self.client.load_table_from_uri(
-            gcs_uri, self.table_ref, job_config=job_config
-        )
-        load_job.result()
+        # The data is already in the table from the initial load,
+        # so no need to reload it here.
 
     @retry_on_transient_error()
     def _table_exists(self) -> bool:
@@ -537,6 +528,7 @@ class BigQueryController:
                 if not chunk:
                     logger.info(f"{'=' * 10} Skipping empty chunk {i} {'=' * 10}")
                     continue
+
                 # Generate a unique identifier for the chunk file
                 chunk_id = f"{uuid.uuid4().hex[:8]}_{i}"
 
@@ -546,12 +538,18 @@ class BigQueryController:
                 )
                 gcs_uris.append(gcs_uri)
 
-                if not table_existed and i == 0:
-                    # For the first chunk of a new table: use schema autodetection
-                    self._create_new_table_with_chunk(gcs_uri, write_disposition)
-                    table_existed = True  # Table now exists for subsequent chunks
+                if not table_existed:
+                    if i == 0:  # Only for the very first chunk when table doesn't exist
+                        # Create table, autodetect schema, and load this first chunk
+                        self._create_new_table_with_chunk(gcs_uri, write_disposition)
+                        table_existed = True  # Table now exists for subsequent chunks
+                    else:
+                        # For subsequent chunks after the table was just created by the first chunk
+                        # We append the data to the newly created and partitioned table
+                        self._load_data_from_gcs(gcs_uri, "WRITE_APPEND")
                 else:
-                    # For existing tables or subsequent chunks: use current schema
+                    # For existing tables, or if the table was just created by a previous chunk,
+                    # simply load the data (appending to existing data if that's the disposition).
                     self._load_data_from_gcs(gcs_uri, write_disposition)
 
                 # Clean up staging file if requested
