@@ -120,13 +120,13 @@ class StorageController:
             if temp_file_path and temp_file_path.exists():
                 temp_file_path.unlink()
 
-    def download_from_gcs(self, file_path: str | None, file_name: str) -> dict:
+    def download_from_gcs(self, blob_path: str | None, blob_name: str) -> dict:
         """
         Download data from Google Cloud Storage and return it as a pandas DataFrame.
 
         Args:
-            file_path (str): Path of the file in GCS to download.
-            file_name (str): Name of the file to download.
+            blob_path (str): Path of the file in GCS to download.
+            blob_name (str): Name of the file to download.
 
         Returns:
             dict: Data parsed from the downloaded file.
@@ -142,14 +142,14 @@ class StorageController:
 
         try:
             blob_name = (
-                f"{file_path.rstrip('/')}/{file_name}" if file_path else file_name
+                f"{blob_path.rstrip('/')}/{blob_name}" if blob_path else blob_name
             )
 
             blob = self.bucket.blob(blob_name)
 
             # Check if the blob exists
             if not blob.exists():
-                error_message = f"File not found in GCS: {file_name}"
+                error_message = f"File not found in GCS: {blob_name}"
                 raise FileNotFoundError(error_message)
 
             with tempfile.NamedTemporaryFile(
@@ -166,14 +166,14 @@ class StorageController:
             return json.loads(json_data)
 
         except NotFound as e:
-            error_message = f"File not found in GCS: {file_name}"
+            error_message = f"File not found in GCS: {blob_name}"
             raise FileNotFoundError(error_message) from e
         except GoogleCloudError:
-            logger.exception(f"Google Cloud error downloading file {file_name}.")
+            logger.exception(f"Google Cloud error downloading file {blob_name}.")
             raise
         except Exception:
             logger.exception(
-                f"An unexpected error occurred while downloading or parsing file {file_name}."
+                f"An unexpected error occurred while downloading or parsing file {blob_name}."
             )
             raise
 
