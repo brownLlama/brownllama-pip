@@ -30,11 +30,7 @@ class StorageController:
 
     """
 
-    def __init__(
-        self,
-        project_id: str,
-        bucket_name: str | None,
-    ) -> None:
+    def __init__(self, project_id: str, bucket_name: str) -> None:
         """
         Initialize the Cloud Storage client and get or create the bucket.
 
@@ -57,7 +53,7 @@ class StorageController:
 
         except NotFound:
             self.bucket = self.storage_client.create_bucket(bucket_name)
-            logger.info(f"{'=' * 10} Created new bucket: {bucket_name} {'=' * 10}")
+            logger.debug(f"{'=' * 10} Created new bucket: {bucket_name} {'=' * 10}")
 
     def upload_to_gcs(
         self, data: dict | list[dict] | pd.DataFrame, prefix: str = "data"
@@ -104,8 +100,8 @@ class StorageController:
             blob.upload_from_filename(temp_file_path)
 
             # Log success
-            logger.info(
-                f"Successfully uploaded data to gs://{self.bucket_name}/{filename}"
+            logger.debug(
+                f"{'=' * 10} Successfully uploaded data to gs://{self.bucket_name}/{filename} {'=' * 10}"
             )
 
         except Exception:
@@ -120,7 +116,7 @@ class StorageController:
             if temp_file_path and temp_file_path.exists():
                 temp_file_path.unlink()
 
-    def download_from_gcs(self, blob_path: str | None, blob_name: str) -> dict:
+    def download_blob(self, blob_path: str, blob_name: str) -> dict:
         """
         Download data from Google Cloud Storage and return it as a pandas DataFrame.
 
@@ -182,6 +178,76 @@ class StorageController:
             if temp_file_path and temp_file_path.exists():
                 temp_file_path.unlink()
 
+    def download_from_blob_path(self, blob_path: str) -> list[dict]:
+        """
+        Download all files within a specific blob path from Google Cloud Storage.
+
+        Assumes all files are JSON and returns a list of dictionaries.
+
+        Args:
+            blob_path (str): The blob_path (path within the bucket, like a folder)
+                          from which to download all files. Should end with '/'
+                          if you want to strictly match a "directory".
+
+        Returns:
+            list[dict]: A list containing the parsed data from all downloaded JSON files.
+
+        Raises:
+            GoogleCloudError: If a Google Cloud related error occurs during listing or downloading.
+            Exception: If any other error occurs.
+
+        """
+        logger.debug(
+            f"{'=' * 10} Downloading all data from GCS blob_path: {blob_path} {'=' * 10}"
+        )
+        all_downloaded_data: list[dict] = []
+        temp_files_paths: list[Path] = []
+
+        try:
+            blobs = self.bucket.list_blobs(blob_path=blob_path)
+
+            for blob in blobs:
+                logger.debug(f"{'=' * 10} Downloading file: {blob.name} {'=' * 10}")
+                temp_file_path = None
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        mode="wb", delete=False, encoding=None, suffix=".json"
+                    ) as temp_file:
+                        blob.download_to_file(temp_file)
+                        temp_file_path = Path(temp_file.name)
+                        temp_files_paths.append(temp_file_path)
+
+                    with open(temp_file_path, encoding="utf-8") as f:
+                        file_data = json.load(f)
+                        all_downloaded_data.append(file_data)
+
+                except json.JSONDecodeError:
+                    logger.warning(f"Skipping file {blob.name}: Not a valid JSON file.")
+                except Exception as e:
+                    logger.warning(
+                        f"Error downloading or processing file {blob.name}: {e}"
+                    )
+                    continue
+
+            return all_downloaded_data
+
+        except GoogleCloudError:
+            logger.exception(
+                f"Google Cloud error listing or downloading files from blob_path {blob_path}."
+            )
+            raise
+        except Exception:
+            logger.exception(
+                f"An unexpected error occurred while downloading all files from blob_path {blob_path}."
+            )
+            raise
+
+        finally:
+            # Clean up all temporary files
+            for temp_path in temp_files_paths:
+                if temp_path.exists():
+                    temp_path.unlink()
+
     def delete_file(self, gcs_uri: str) -> None:
         """
         Delete a file from Google Cloud Storage.
@@ -197,7 +263,7 @@ class StorageController:
 
             # Delete the blob
             self.bucket.blob(blob_name).delete()
-            logger.info(f"Deleted file: {gcs_uri}")
+            logger.debug(f"{'=' * 10} Deleted file: {gcs_uri} {'=' * 10}")
 
         except NotFound:
             # File not found is often acceptable for cleanup operations
