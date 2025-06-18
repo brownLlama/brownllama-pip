@@ -533,7 +533,7 @@ class BigQueryController:
                 chunk_id = f"{uuid.uuid4().hex[:8]}_{i}"
 
                 # Upload the chunk to GCS
-                gcs_uri = self.storage_controller.upload_to_gcs(
+                gcs_uri = self.storage_controller.upload_blob(
                     chunk, prefix=f"{self.table_id}_data_{chunk_id}"
                 )
                 gcs_uris.append(gcs_uri)
@@ -554,7 +554,7 @@ class BigQueryController:
 
                 # Clean up staging file if requested
                 if delete_gcs_file:
-                    self.storage_controller.delete_file(gcs_uri)
+                    self.storage_controller.delete_blob(gcs_uri)
 
             # If we processed any data, log results
             if gcs_uris:

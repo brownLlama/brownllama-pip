@@ -55,7 +55,7 @@ class StorageController:
             self.bucket = self.storage_client.create_bucket(bucket_name)
             logger.debug(f"{'=' * 10} Created new bucket: {bucket_name} {'=' * 10}")
 
-    def upload_to_gcs(
+    def upload_blob(
         self, data: dict | list[dict] | pd.DataFrame, prefix: str = "data"
     ) -> str:
         """
@@ -180,17 +180,17 @@ class StorageController:
 
     def download_from_blob_path(self, blob_path: str) -> list[dict]:
         """
-        Download all files within a specific blob path from Google Cloud Storage.
+        Download data from Google Cloud Storage and return it as a list of dictionaries.
 
-        Assumes all files are JSON and returns a list of dictionaries.
+        Download all CSV files within a specific blob path from Google Cloud Storage
+        and convert them to a list of dictionaries (JSON objects).
 
         Args:
             blob_path (str): The blob_path (path within the bucket, like a folder)
-                          from which to download all files. Should end with '/'
-                          if you want to strictly match a "directory".
+                             from which to download all files.
 
         Returns:
-            list[dict]: A list containing the parsed data from all downloaded JSON files.
+            list[dict]: A list containing the parsed data from all downloaded CSV files.
 
         Raises:
             GoogleCloudError: If a Google Cloud related error occurs during listing or downloading.
@@ -204,9 +204,16 @@ class StorageController:
         temp_files_paths: list[Path] = []
 
         try:
+            # Ensure blob_path ends with '/' for directory-like listing if it's not empty
+            prefix = blob_path.rstrip("/") + "/" if blob_path else ""
             blobs = self.bucket.list_blobs(prefix=blob_path)
 
             for blob in blobs:
+                # Skip "directories" if prefix includes them (e.g., if blob_path is "my_folder/",
+                # and there's a blob named "my_folder/sub_folder/", it might be listed)
+                if blob.name == prefix:
+                    continue
+
                 logger.debug(f"{'=' * 10} Downloading file: {blob.name} {'=' * 10}")
                 temp_file_path = None
                 try:
@@ -217,12 +224,13 @@ class StorageController:
                         temp_file_path = Path(temp_file.name)
                         temp_files_paths.append(temp_file_path)
 
-                    with open(temp_file_path, encoding="utf-16") as f:
-                        file_data = json.load(f)
-                        all_downloaded_data.append(file_data)
+                    # Read the data as a pandas DataFrame (from CSV)
+                    dataframe_data = pd.read_csv(temp_file_path, encoding="utf-16")
 
-                except json.JSONDecodeError:
-                    logger.warning(f"Skipping file {blob.name}: Not a valid JSON file.")
+                    # Convert dataframe to JSON and then load it as a Python dictionary
+                    json_data = dataframe_data.to_json(orient="records")
+                    all_downloaded_data.extend(json.loads(json_data))
+
                 except Exception as e:
                     logger.warning(
                         f"Error downloading or processing file {blob.name}: {e}"
@@ -248,7 +256,7 @@ class StorageController:
                 if temp_path.exists():
                     temp_path.unlink()
 
-    def delete_file(self, gcs_uri: str) -> None:
+    def delete_blob(self, gcs_uri: str) -> None:
         """
         Delete a file from Google Cloud Storage.
 
