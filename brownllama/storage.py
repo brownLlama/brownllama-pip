@@ -204,7 +204,7 @@ class StorageController:
         temp_files_paths: list[Path] = []
 
         try:
-            blobs = self.bucket.list_blobs(blob_path=blob_path)
+            blobs = self.bucket.list_blobs(prefix=blob_path)
 
             for blob in blobs:
                 logger.debug(f"{'=' * 10} Downloading file: {blob.name} {'=' * 10}")
