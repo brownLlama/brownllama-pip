@@ -166,8 +166,8 @@ class BigQueryController:
 
         """
         try:
-            self.dataset_id = bigquery_payload.dataset_id
             self.project_id = bigquery_payload.project_id
+            self.dataset_id = bigquery_payload.dataset_id
             self.table_id = bigquery_payload.table_id
             self.bucket_name = bigquery_payload.bucket_name
 
