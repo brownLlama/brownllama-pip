@@ -52,7 +52,7 @@ class BigqueryQuery:
                                    with dates/datetimes formatted as ISO strings.
 
         """
-        logger.debug(f"{'=' * 10}\nExecuting query:\n{query}\n{'=' * 10}")
+        logger.debug(f"{'=' * 10} Executing query in BQ {'=' * 10}")
         query_job = self.client.query(query)
         results = query_job.result()
 
