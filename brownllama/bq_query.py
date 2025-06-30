@@ -5,8 +5,8 @@ Classes:
     BigqueryQuery: A class to execute BigQuery queries and return results in JSON format.
 """
 
-# Removed date, datetime import as specific handling is no longer needed
-from typing import Any  # Import Any for type hinting
+from datetime import date, datetime
+from typing import Any
 
 from google.cloud import bigquery
 
@@ -41,13 +41,15 @@ class BigqueryQuery:
         """
         Execute a BigQuery SQL query and returns the results as a list of dictionaries.
 
-        Raises an exception if the query fails or results cannot be serialized.
+        Date and datetime objects are converted to ISO 8601 strings to ensure JSON serializability.
+        Raises an exception if the query fails or data processing encounters an issue.
 
         Args:
             query (str): The SQL query string to execute.
 
         Returns:
-            list[dict[str, Any]]: A list of dictionaries representing the query results.
+            list[dict[str, Any]]: A list of dictionaries representing the query results,
+                                   with dates/datetimes formatted as ISO strings.
 
         """
         logger.debug(f"{'=' * 10}\nExecuting query:\n{query}\n{'=' * 10}")
@@ -59,10 +61,13 @@ class BigqueryQuery:
         for row in results:
             row_dict = {}
             for key, value in row.items():
-                row_dict[key] = value
+                if isinstance(value, (date, datetime)):
+                    # Convert date/datetime objects to ISO 8601 string format
+                    row_dict[key] = value.isoformat()
+                else:
+                    # Keep other values as they are from the query result
+                    row_dict[key] = value
             rows_dict.append(row_dict)
 
-        logger.debug(
-            f"{'=' * 10} Query executed successfully. Results converted to list of dictionaries. {'=' * 10}"
-        )
+        logger.debug(f"{'=' * 10} Query executed successfully.  {'=' * 10}")
         return rows_dict
