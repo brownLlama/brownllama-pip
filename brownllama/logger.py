@@ -31,6 +31,7 @@ LIBRARIES: set[str] = {
     "google.cloud",
     "pydantic",
     "pandas",
+    "brownllama",
 }
 
 

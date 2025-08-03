@@ -57,6 +57,10 @@ To build and publish the package, follow these steps:
 
     NOTE: PyPI is public and should not be used for sensitive information. Also, you need to setup `~/.pypirc` with your PyPI credentials.
 
+### Versioning Error:
+
+If there is some error on versioning, then you simply delete `dist` directory and run `uv build` again.
+
 ## Usage
 
 After installation, you can import and use the modules and classes provided by `brownllama` in your Python projects.
