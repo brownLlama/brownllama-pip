@@ -6,107 +6,201 @@ with consistent settings to ensure uniform logging behavior.
 """
 
 import logging
+import os
+import sys
 from logging import Logger
+from typing import ClassVar
+
+DEBUG = logging.DEBUG
+INFO = logging.INFO
+WARNING = logging.WARNING
+ERROR = logging.ERROR
+CRITICAL = logging.CRITICAL
+
+LIBRARIES: set[str] = {
+    "requests",
+    "urllib3",
+    "uwsgi",
+    "gunicorn",
+    "celery",
+    "starlette",
+    "uvicorn",
+    "fastapi",
+    "google.api_core",
+    "google.cloud",
+    "pydantic",
+    "pandas",
+}
 
 
-class LoggerConfigurator:
-    """A class to manage logger configuration state and operations."""
+class ColorFormatter(logging.Formatter):
+    """Custom formatter that colors the entire log prefix (timestamp | level | name |)."""
 
-    _library_loggers_configured: bool = False
+    COLORS: ClassVar[dict[int, str]] = {
+        logging.DEBUG: "\033[37m",  # Bright Gray
+        logging.INFO: "\033[34m",  # Blue
+        logging.WARNING: "\033[33m",  # Yellow
+        logging.ERROR: "\033[31m",  # Red
+        logging.CRITICAL: "\033[1;31m",  # Bold Red
+    }
+    RESET: ClassVar[str] = "\033[0m"
 
-    @classmethod
-    def _configure_library_loggers(cls, level: int) -> None:
+    # Expected number of parts in log format: timestamp | level | name | message
+    _EXPECTED_LOG_PARTS: ClassVar[int] = 4
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
         """
-        Configure third-party library loggers with consistent settings.
-
-        Sets the specified logging level and removes existing handlers for known
-        third-party libraries to ensure they inherit the root logger's configuration.
+        Initialize the formatter with color support.
 
         Args:
-            level: The logging level to set for all third-party library loggers.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
 
         """
-        libraries = [
-            "requests",
-            "gunicorn",
-            "uwsgi",
-            "celery",
-            "urllib3",
-            "starlette",
-            "uvicorn",
-        ]
-        for lib in libraries:
-            lib_logger = logging.getLogger(lib)
-            # Remove existing handlers to prevent duplicates
-            for handler in lib_logger.handlers[:]:
-                lib_logger.removeHandler(handler)
-            lib_logger.setLevel(level)
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        # Simple TTY check for color support
+        self.use_colors = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
-            console_handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            console_handler.setFormatter(formatter)
-            lib_logger.addHandler(console_handler)
-            # Prevent propagation to avoid root logger handling if configured elsewhere
-            lib_logger.propagate = False
-
-    @classmethod
-    def get_logger(cls, name: str, level: int = logging.DEBUG) -> Logger:
+    def format(self, record: logging.LogRecord) -> str:
         """
-        Retrieve a configured logger instance.
-
-        Initializes logging configuration on first call, including root logger setup
-        and third-party library configuration. Subsequent calls return existing loggers.
+        Format the log record with colors for the prefix.
 
         Args:
-            name: The name of the logger to retrieve/create.
-            level: The logging level to configure (only used on first call).
+            record: The log record to format.
 
         Returns:
-            A configured Logger instance with the specified name.
+            str: The formatted log record.
 
         """
-        if not cls._library_loggers_configured:
-            # Configure root logger first to ensure base configuration
-            root_logger = logging.getLogger()
-            root_logger.setLevel(level)
+        formatted = super().format(record)
 
-            # Clear root logger handlers if any to avoid duplicates
-            for handler in root_logger.handlers[:]:
-                root_logger.removeHandler(handler)
+        if not self.use_colors:
+            return formatted
 
-            # Setup console handler for root logger
-            console_handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            console_handler.setFormatter(formatter)
-            root_logger.addHandler(console_handler)
+        # Split at the first " | " after the prefix (timestamp | level | name) to separate from message.
+        parts = formatted.split(" | ", 3)
 
-            # Configure third-party loggers
-            cls._configure_library_loggers(level)
-            cls._library_loggers_configured = True
+        if len(parts) == self._EXPECTED_LOG_PARTS:
+            # Reconstruct the full prefix string to be colored, including the last " | "
+            colored_prefix_str = f"{parts[0]} | {parts[1]} | {parts[2]} | "
+            message = parts[3]
 
-        # Get the requested logger
+            color = self.COLORS.get(record.levelno, self.RESET)
+            # Apply color to the full prefix including the last '|', then reset, then append message.
+            return f"{color}{colored_prefix_str}{self.RESET}{message}"
+
+        return formatted
+
+
+class LlamaLogger:
+    """Simple logger configuration that auto-detects dev/prod mode."""
+
+    _configured: ClassVar[bool] = False
+    _app_level: ClassVar[int] = logging.INFO
+
+    @classmethod
+    def _is_dev_mode(cls) -> bool:
+        """
+        Check if we're running on Cloud Run (production) or local (development).
+
+        Returns:
+            bool: True if we're running on Cloud Run, False otherwise
+
+        """
+        # Allow LOCAL_INFO=1 to test INFO mode locally
+        if os.getenv("LOCAL_INFO", "").lower() in {"1", "true", "yes"}:
+            return False
+        # Check running on Cloud Run
+        return not bool(os.getenv("K_SERVICE"))
+
+    @classmethod
+    def configure_logging(cls, dev_mode: bool | None = None) -> None:
+        """
+        Configure logging once. Libraries=DEBUG, App=DEBUG if dev else INFO.
+
+        Args:
+            dev_mode: Explicitly set the logging mode. If None, it will be
+                auto-detected based on the environment.
+
+        """
+        if cls._configured:
+            return
+
+        if dev_mode is None:
+            dev_mode = cls._is_dev_mode()
+
+        root = logging.getLogger()
+        root.setLevel(logging.DEBUG)
+        root.handlers.clear()
+
+        # Console handler with colored formatter
+        handler = logging.StreamHandler()
+        formatter = ColorFormatter(
+            "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+        )
+        handler.setFormatter(formatter)
+        root.addHandler(handler)
+
+        # This loop explicitly sets 3rd party libraries to DEBUG.
+        # This is the key part that ensures they always show debug logs.
+        for lib in LIBRARIES:
+            logging.getLogger(lib).setLevel(logging.DEBUG)
+
+        # Store app level
+        cls._app_level = logging.DEBUG if dev_mode else logging.INFO
+        cls._configured = True
+
+    @classmethod
+    def get_logger(cls, name: str, level: int | str | None = None) -> Logger:
+        """
+        Get logger for app code. Auto-configures if needed.
+
+        Args:
+            name: The name of the logger, typically __name__.
+            level: The logging level to set for this logger. If None, the
+                default app level is used.
+
+        Returns:
+            A configured logging.Logger instance.
+
+        """
+        if not cls._configured:
+            cls.configure_logging()
+
         logger = logging.getLogger(name)
-        logger.setLevel(level)
 
-        # Prevent adding multiple handlers if logger is reused
-        if not logger.handlers:
-            # Use the same handler as root logger to maintain consistency
-            console_handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-            )
-            console_handler.setFormatter(formatter)
-            logger.addHandler(console_handler)
+        # Handle string levels
+        if isinstance(level, str):
+            level = getattr(logging, level.upper())
 
-        # Prevent propagation to avoid double logging from ancestor handlers
-        logger.propagate = False
+        logger.setLevel(level if level is not None else cls._app_level)
 
         return logger
 
 
-# Public interface remains the same
-get_logger = LoggerConfigurator.get_logger
+def configure_logging(dev_mode: bool | None = None) -> None:
+    """
+    Configure logging once. Libraries=DEBUG, App=DEBUG if dev else INFO.
+
+    Args:
+        dev_mode: Explicitly set the logging mode. If None, it will be
+            auto-detected based on the environment.
+
+    """
+    LlamaLogger.configure_logging(dev_mode)
+
+
+def get_logger(name: str, level: int | str | None = None) -> Logger:
+    """
+    Get logger for app code. Auto-configures if needed.
+
+    Args:
+        name: The name of the logger, typically __name__.
+        level: The logging level to set for this logger. If None, the
+            default app level is used.
+
+    Returns:
+        A configured logging.Logger instance.
+
+    """
+    return LlamaLogger.get_logger(name, level)
