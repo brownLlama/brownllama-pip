@@ -17,6 +17,7 @@ WARNING = logging.WARNING
 ERROR = logging.ERROR
 CRITICAL = logging.CRITICAL
 
+# A set of common third-party libraries whose logging levels we want to control.
 LIBRARIES: set[str] = {
     "requests",
     "urllib3",
@@ -34,32 +35,41 @@ LIBRARIES: set[str] = {
 
 
 class ColorFormatter(logging.Formatter):
-    """Custom formatter that colors the entire log prefix (timestamp | level | name |)."""
+    """
+    Custom formatter that colors the entire log prefix (timestamp | level | name |).
+
+    This version is enhanced to use a different color for DEBUG logs originating
+    from third-party libraries.
+    """
 
     COLORS: ClassVar[dict[int, str]] = {
-        logging.DEBUG: "\033[37m",  # Bright Gray
+        logging.DEBUG: "\033[37m",  # Gray
         logging.INFO: "\033[34m",  # Blue
         logging.WARNING: "\033[33m",  # Yellow
         logging.ERROR: "\033[31m",  # Red
         logging.CRITICAL: "\033[1;31m",  # Bold Red
     }
+    # Bright Cyan for DEBUG logs from third-party libraries
+    LIBRARY_DEBUG_COLOR: ClassVar[str] = "\033[36m"
     RESET: ClassVar[str] = "\033[0m"
 
     # Expected number of parts in log format: timestamp | level | name | message
     _EXPECTED_LOG_PARTS: ClassVar[int] = 4
 
-    def __init__(self, *args: object, **kwargs: object) -> None:
+    def __init__(self, fmt: str, library_names: set[str]) -> None:
         """
-        Initialize the formatter with color support.
+        Initialize the formatter with color support and library names.
 
         Args:
-            *args: Variable length argument list.
-            **kwargs: Arbitrary keyword arguments.
+            fmt: The format string for the log message.
+            library_names: A set of logger names that should be considered
+                           third-party libraries.
 
         """
-        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        super().__init__(fmt)
         # Simple TTY check for color support
         self.use_colors = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+        self.library_names = library_names
 
     def format(self, record: logging.LogRecord) -> str:
         """
@@ -77,15 +87,24 @@ class ColorFormatter(logging.Formatter):
         if not self.use_colors:
             return formatted
 
+        # Determine the color to use.
+        # Check if the log is a DEBUG level from a library.
+        if record.levelno == logging.DEBUG and any(
+            record.name.startswith(lib) for lib in self.library_names
+        ):
+            color = self.LIBRARY_DEBUG_COLOR
+        else:
+            # Otherwise, use the standard color for the log level.
+            color = self.COLORS.get(record.levelno, self.RESET)
+
         # Split at the first " | " after the prefix (timestamp | level | name) to separate from message.
-        parts = formatted.split(" | ", 3)
+        parts = formatted.split(" | ", self._EXPECTED_LOG_PARTS - 1)
 
         if len(parts) == self._EXPECTED_LOG_PARTS:
             # Reconstruct the full prefix string to be colored, including the last " | "
             colored_prefix_str = f"{parts[0]} | {parts[1]} | {parts[2]} | "
             message = parts[3]
 
-            color = self.COLORS.get(record.levelno, self.RESET)
             # Apply color to the full prefix including the last '|', then reset, then append message.
             return f"{color}{colored_prefix_str}{self.RESET}{message}"
 
@@ -135,8 +154,10 @@ class LlamaLogger:
 
         # Console handler with colored formatter
         handler = logging.StreamHandler()
+        # Instantiate the custom formatter and pass the list of library names
         formatter = ColorFormatter(
-            "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+            "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+            library_names=LIBRARIES,
         )
         handler.setFormatter(formatter)
         root.addHandler(handler)
