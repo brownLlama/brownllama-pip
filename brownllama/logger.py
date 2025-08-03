@@ -43,7 +43,7 @@ class ColorFormatter(logging.Formatter):
     """
 
     COLORS: ClassVar[dict[int, str]] = {
-        logging.DEBUG: "\033[37m",  # Gray
+        logging.DEBUG: "\033[95m",  # Purple
         logging.INFO: "\033[34m",  # Blue
         logging.WARNING: "\033[33m",  # Yellow
         logging.ERROR: "\033[31m",  # Red

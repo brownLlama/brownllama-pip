@@ -37,13 +37,19 @@ To build and publish the package, follow these steps:
     uv add build twine
     ```
 
-2.  Build the package:
+2.  Change the version number in `pyproject.toml` file
+
+    ```toml
+    version = "0.1.XXX"
+    ```
+
+3.  Build the package:
 
     ```bash
     uv build
     ```
 
-3.  Publish the package in PyPI
+4.  Publish the package in PyPI
 
     ```bash
     uvx twine upload --verbose dist/*
