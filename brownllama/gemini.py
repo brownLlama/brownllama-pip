@@ -7,7 +7,7 @@ This module provides a class for generating responses, chat using the GenAI API.
 from google import genai
 
 
-class GenAIResponseGenerator:
+class GenAI:
     """A class for generating responses using the GenAI API."""
 
     def __init__(self, api_key: str) -> None:
