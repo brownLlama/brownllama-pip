@@ -18,7 +18,8 @@ class GenAI:
             api_key (str): The API key for accessing the GenAI API.
 
         """
-        self.client = genai.Client(api_key)
+        genai.configure(api_key=api_key)
+        self.client = genai.Client()
         self.model = "gemini-2.5-flash"
 
     def generate_response(self, prompt: str) -> str:
