@@ -21,6 +21,7 @@ CRITICAL = logging.CRITICAL
 LIBRARIES: set[str] = {
     "requests",
     "urllib3",
+    "httpcore",
     "uwsgi",
     "gunicorn",
     "celery",
@@ -29,6 +30,7 @@ LIBRARIES: set[str] = {
     "fastapi",
     "google.api_core",
     "google.cloud",
+    "google.genai",
     "pydantic",
     "pandas",
     "brownllama",
