@@ -4,7 +4,7 @@ requires = [ "hatchling" ]
 
 [project]
 name = "brownllama"
-version = "0.1.26"
+version = "0.1.27"
 description = "Standard PIP Package for GCP integration apps."
 readme = "README.md"
 license-files = [ "LICENSE" ]
@@ -22,6 +22,7 @@ dependencies = [
   "google-cloud-bigquery>=3.34",
   "google-cloud-secret-manager>=2.23.3",
   "google-cloud-storage>=3.1",
+  "google-genai>=1.30",
   "pandas>=2.2.3",
   "pydantic>=2.11.5",
 ]
