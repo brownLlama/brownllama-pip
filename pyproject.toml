@@ -4,7 +4,7 @@ requires = [ "hatchling" ]
 
 [project]
 name = "brownllama"
-version = "0.1.29"
+version = "0.1.31"
 description = "Standard PIP Package for GCP integration apps."
 readme = "README.md"
 license-files = [ "LICENSE" ]
