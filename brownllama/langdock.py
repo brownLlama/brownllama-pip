@@ -21,7 +21,7 @@ class Langdock:
         self.url = "https://api.langdock.com/openai/eu/v1/chat/completions"
         self.headers = {"Authorization": api_key, "Content-Type": "application/json"}
 
-    def generate_response(self, prompt: str) -> str:
+    def generate_response(self, prompt: str) -> dict:
         """
         Generate a response using the GenAI API.
 
