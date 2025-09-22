@@ -33,7 +33,7 @@ class Langdock:
 
         """
         payload = {
-            "model": "gpt-4o-mini",
+            "model": "gpt-5-mini",
             "messages": [
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt},
