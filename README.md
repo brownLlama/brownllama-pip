@@ -70,7 +70,6 @@ After installation, you can import and use the modules and classes provided by `
 ```python
 from brownllama.bigquery import BigQueryController
 
-
 bq_controller = BigQueryController(bigquery_payload=bigquery_payload, key_path=key_path)
 
 # Example: Export JSON data to BigQuery via GCS
