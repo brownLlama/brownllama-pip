@@ -47,7 +47,7 @@ class SecretManager:
             The secret data as bytes.
 
         """
-        logger.info(f"{'=' * 10} Retrieving secret from GCP. {'=' * 10}")
+        logger.info("Retrieving secret from GCP")
         name = f"{self.parent}/secrets/{secret_id}/versions/{version}"
         response = self.client.access_secret_version(name=name)
         return response.payload.data
@@ -70,7 +70,7 @@ class SecretManager:
             Exception: If an unexpected error occurs during secret creation or version addition.
 
         """
-        logger.info(f"{'=' * 10} Adding secret to GCP {'=' * 10}")
+        logger.info("Adding secret to GCP")
         secret_name = f"{self.parent}/secrets/{secret_id}"
         try:
             # Try to get the secret to check if it already exists
@@ -112,7 +112,7 @@ class SecretManager:
             secret_id: The ID of the secret to delete.
 
         """
-        logger.warning(f"{'=' * 10} Deleting secret from GCP {'=' * 10}")
+        logger.warning("Deleting secret from GCP")
         name = f"{self.parent}/secrets/{secret_id}"
         self.client.delete_secret(name=name)
 
@@ -124,5 +124,5 @@ class SecretManager:
             A list of Secret objects.
 
         """
-        logger.info(f"{'=' * 10} Listing secrets from GCP {'=' * 10}")
+        logger.info("Listing secrets from GCP")
         return self.client.list_secrets(parent=self.parent)

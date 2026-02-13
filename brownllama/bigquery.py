@@ -104,21 +104,19 @@ def retry_on_transient_error(
                     if attempt < max_retries:
                         sleep_time = min(delay, max_delay)
                         warning_msg = (
-                            f"{'=' * 10} Transient error occurred: {e!s}. "
-                            f"Retrying in {sleep_time:.1f} seconds. "
-                            f"(Attempt {attempt + 1}/{max_retries}) {'=' * 10}"
+                            f"Transient error occurred: {e!s}."
+                            f"Retrying in {sleep_time:.1f} seconds."
+                            f"(Attempt {attempt + 1}/{max_retries})"
                         )
                         logger.warning(warning_msg)
                         time.sleep(sleep_time)
                         delay *= backoff_factor
                     else:
-                        error_msg = f"{'=' * 10} Operation failed after {max_retries} retries {'=' * 10}"
+                        error_msg = f"Operation failed after {max_retries} retries"
                         logger.exception(error_msg)
                         raise
                 except Exception as e:
-                    error_msg = (
-                        f"{'=' * 10} Non-transient error occurred: {e!s} {'=' * 10}"
-                    )
+                    error_msg = f"Non-transient error occurred: {e!s}"
                     logger.exception(error_msg)
                     raise
 
@@ -192,12 +190,10 @@ class BigQueryController:
             )
 
             logger.info(
-                f"{'=' * 10} BigQueryController initialized for {self.dataset_id}.{self.table_id} {'=' * 10}"
+                f"BigQueryController initialized for {self.dataset_id}.{self.table_id}"
             )
         except Exception:
-            logger.exception(
-                f"{'=' * 10} Failed to initialize BigQueryController. {'=' * 10}"
-            )
+            logger.exception("Failed to initialize BigQueryController.")
             raise
 
     @retry_on_transient_error()
@@ -229,7 +225,7 @@ class BigQueryController:
             load_job.result()
 
         except Exception:
-            logger.exception(f"{'=' * 10} Failed to load data {'=' * 10}")
+            logger.exception("Failed to load data")
             raise
 
     @retry_on_transient_error()
@@ -247,7 +243,7 @@ class BigQueryController:
             Exception: For other unexpected errors during the operation
 
         """
-        logger.debug(f"{'=' * 10} Creating partition on the table {'=' * 10}")
+        logger.debug("Creating partition on the table")
 
         try:
             # Get current table schema
@@ -304,7 +300,7 @@ class BigQueryController:
             # Create the temporary table
             created_table = self.client.create_table(new_table)
             logger.debug(
-                f"{'=' * 10} Created temporary partitioned table {created_table.full_table_id} {'=' * 10}"
+                f"Created temporary partitioned table {created_table.full_table_id}"
             )
 
             # Copy data from original table to the temporary table
@@ -335,12 +331,10 @@ class BigQueryController:
             rename_job.result()
 
             logger.info(
-                f"{'=' * 10} Created partitioned table {self.project_id}.{self.dataset_id}.{self.table_id} {'=' * 10}",
+                f"Created partitioned table {self.project_id}.{self.dataset_id}.{self.table_id}",
             )
         except Exception:
-            logger.exception(
-                f"{'=' * 10} Failed to create partitioned table. {'=' * 10}"
-            )
+            logger.exception("Failed to create partitioned table.")
             raise
 
     @retry_on_transient_error()
@@ -356,7 +350,7 @@ class BigQueryController:
 
         """
         logger.info(
-            f"{'=' * 10} Table {self.table_id} does not exist. Using schema autodetection. {'=' * 10}"
+            f"Table {self.table_id} does not exist. Using schema autodetection."
         )
 
         # Initial load with autodetection
@@ -392,7 +386,7 @@ class BigQueryController:
         except NotFound:
             return False
         except GoogleAPIError:
-            logger.exception(f"{'=' * 10} Error checking if table exists. {'=' * 10}")
+            logger.exception("Error checking if table exists.")
             raise
         else:
             return True
@@ -500,9 +494,7 @@ class BigQueryController:
             )
             # Return early if there's no data to process
             if not data_list:
-                logger.info(
-                    f"{'=' * 10} No data to process, skipping BigQuery export {'=' * 10}"
-                )
+                logger.info("No data to process, skipping BigQuery export")
                 return []
 
             # Check if we need to chunk the data
@@ -512,9 +504,7 @@ class BigQueryController:
                 if len(data_list) > chunk_size
                 else [data_list]
             )
-            logger.info(
-                f"{'=' * 10} Processing {len(data_list)} records in {len(chunks)} chunks {'=' * 10}"
-            )
+            logger.info(f"Processing {len(data_list)} records in {len(chunks)} chunks")
 
             # Check if table exists
             table_existed = self._table_exists()
@@ -526,7 +516,7 @@ class BigQueryController:
             for i, chunk in enumerate(chunks):
                 # Skip empty chunks
                 if not chunk:
-                    logger.info(f"{'=' * 10} Skipping empty chunk {i} {'=' * 10}")
+                    logger.info(f"Skipping empty chunk {i}")
                     continue
 
                 # Generate a unique identifier for the chunk file
@@ -559,17 +549,11 @@ class BigQueryController:
             # If we processed any data, log results
             if gcs_uris:
                 table = self.client.get_table(self.table_ref)
-                logger.info(
-                    f"{'=' * 10} Loaded {len(data_list)} records into {self.table_id} {'=' * 10}"
-                )
-                logger.info(
-                    f"{'=' * 10} Table {self.table_id} now has {table.num_rows} rows {'=' * 10}"
-                )
+                logger.info(f"Loaded {len(data_list)} records into {self.table_id}")
+                logger.info(f"Table {self.table_id} now has {table.num_rows} rows")
 
         except Exception:
-            logger.exception(
-                f"{'=' * 10} Failed to export data to BigQuery. {'=' * 10}"
-            )
+            logger.exception("Failed to export data to BigQuery.")
             raise
 
         else:
@@ -595,5 +579,5 @@ class BigQueryController:
             results = query_job.result()
             return [dict(row) for row in results]
         except Exception:
-            logger.exception(f"{'=' * 10} Query execution failed. {'=' * 10}")
+            logger.exception("Query execution failed.")
             raise

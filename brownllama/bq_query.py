@@ -33,9 +33,7 @@ class BigqueryQuery:
 
         """
         self.client = bigquery.Client(project=project_id)
-        logger.debug(
-            f"{'=' * 10} BigQuery client initialized for project: {project_id} {'=' * 10}"
-        )
+        logger.debug(f"BigQuery client initialized for project: {project_id}")
 
     def execute_query(self, query: str) -> list[dict[str, Any]]:
         """
@@ -52,7 +50,7 @@ class BigqueryQuery:
                                    with dates/datetimes formatted as ISO strings.
 
         """
-        logger.debug(f"{'=' * 10} Executing query in BQ {'=' * 10}")
+        logger.debug("Executing query in BQ")
         query_job = self.client.query(query)
         results = query_job.result()
 
@@ -69,5 +67,5 @@ class BigqueryQuery:
                     row_dict[key] = value
             rows_dict.append(row_dict)
 
-        logger.debug(f"{'=' * 10} Query executed successfully.  {'=' * 10}")
+        logger.debug("Query executed successfully")
         return rows_dict
