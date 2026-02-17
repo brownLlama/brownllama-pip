@@ -514,35 +514,28 @@ class BigQueryController:
 
             # Process each chunk
             for i, chunk in enumerate(chunks):
-                # Skip empty chunks
                 if not chunk:
                     logger.info(f"Skipping empty chunk {i}")
                     continue
 
-                # Generate a unique identifier for the chunk file
                 chunk_id = f"{uuid.uuid4().hex[:8]}_{i}"
 
-                # Upload the chunk to GCS
                 gcs_uri = self.storage_controller.upload_blob(
                     chunk, prefix=f"{self.table_id}_data_{chunk_id}"
                 )
                 gcs_uris.append(gcs_uri)
 
                 if not table_existed:
-                    if i == 0:  # Only for the very first chunk when table doesn't exist
-                        # Create table, autodetect schema, and load this first chunk
+                    if i == 0:
                         self._create_new_table_with_chunk(gcs_uri, write_disposition)
-                        table_existed = True  # Table now exists for subsequent chunks
+                        table_existed = True
                     else:
-                        # For subsequent chunks after the table was just created by the first chunk
-                        # We append the data to the newly created and partitioned table
                         self._load_data_from_gcs(gcs_uri, "WRITE_APPEND")
-                else:
-                    # For existing tables, or if the table was just created by a previous chunk,
-                    # simply load the data (appending to existing data if that's the disposition).
+                elif i == 0:
                     self._load_data_from_gcs(gcs_uri, write_disposition)
+                else:
+                    self._load_data_from_gcs(gcs_uri, "WRITE_APPEND")
 
-                # Clean up staging file if requested
                 if delete_gcs_file:
                     self.storage_controller.delete_blob(gcs_uri)
 
