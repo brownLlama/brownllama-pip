@@ -7,11 +7,13 @@ This module provides a class for interacting with Google Cloud Storage.
 from __future__ import annotations
 
 import json
+import mimetypes
 import tempfile
 import uuid
 from pathlib import Path
 
 import pandas as pd
+import requests
 from google.cloud import storage
 from google.cloud.exceptions import GoogleCloudError, NotFound
 
@@ -286,3 +288,66 @@ class StorageController:
             logger.exception(
                 f"An unexpected error occurred while deleting file {gcs_uri}."
             )
+
+    def upload_from_url(
+        self,
+        download_url: str,
+        blob_name: str,
+        content_type: str | None = None,
+        timeout: int = 120,
+        chunk_size: int = 8 * 1024 * 1024,
+    ) -> str:
+        """
+        Stream any file from a URL directly into GCS.
+
+        Args:
+            download_url: The URL to download the file from.
+            blob_name: The destination blob name in GCS (e.g. "raw/report.csv").
+            content_type: Optional MIME type. If None, it will be inferred from
+                          the response headers or default to application/octet-stream.
+            timeout: Request timeout in seconds.
+            chunk_size: Size of chunks for resumable upload (default 8MB).
+
+        Returns:
+            The GCS URI of the uploaded file.
+
+        Raises:
+            requests.RequestException: If the download fails.
+            GoogleCloudError: If the upload to GCS fails.
+
+        """
+        logger.info(
+            "Uploading file from URL to gs://%s/%s", self.bucket_name, blob_name
+        )
+
+        try:
+            response = requests.get(download_url, timeout=timeout, stream=True)
+            response.raise_for_status()
+
+            # Determine content type: explicit > response header > guess from name > fallback
+            if content_type is None:
+                content_type = response.headers.get("Content-Type")
+
+            if content_type is None or content_type == "application/octet-stream":
+                guessed, _ = mimetypes.guess_type(blob_name)
+                content_type = guessed or "application/octet-stream"
+
+            blob = self.bucket.blob(blob_name, chunk_size=chunk_size)
+
+            with blob.open("wb", content_type=content_type) as blob_writer:
+                for chunk in response.iter_content(chunk_size=chunk_size):
+                    if chunk:
+                        blob_writer.write(chunk)
+
+            gcs_uri = f"gs://{self.bucket_name}/{blob_name}"
+            logger.info(
+                "Successfully uploaded to %s (content_type=%s)", gcs_uri, content_type
+            )
+            return gcs_uri
+
+        except requests.RequestException:
+            logger.exception("Failed to download file from URL: %s", download_url)
+            raise
+        except GoogleCloudError:
+            logger.exception("Failed to upload file to GCS: %s", blob_name)
+            raise
