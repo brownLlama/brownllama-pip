@@ -76,10 +76,8 @@ class StorageController:
         """
         logger.debug(f"{'=' * 10} Exporting data to GCS {'=' * 10}")
         temp_file_path: Path | None = None
-        # Generate a unique filename
         filename = f"{prefix}_{uuid.uuid4().hex}.json"
 
-        # Convert data to a pandas DataFrame if it's not already
         if isinstance(data, (dict, list)):
             dataframe_data = (
                 pd.DataFrame(data) if isinstance(data, list) else pd.DataFrame([data])
@@ -94,14 +92,22 @@ class StorageController:
                 suffix=".json",
                 encoding="utf-8",
             ) as temp_file:
-                dataframe_data.to_json(temp_file.name, orient="records", lines=True)
-                temp_file_path = Path(temp_file.name)  # Changed to Path object
+                temp_file_path = Path(temp_file.name)
 
-            # Upload the file to GCS
+            dataframe_data.to_json(
+                temp_file_path,
+                orient="records",
+                lines=True,
+                force_ascii=False,
+                date_format="iso",
+                default_handler=str,
+            )
+
             blob = self.bucket.blob(filename)
-            blob.upload_from_filename(temp_file_path)
+            blob.upload_from_filename(
+                temp_file_path, content_type="application/json; charset=utf-8"
+            )
 
-            # Log success
             logger.debug(
                 f"{'=' * 10} Successfully uploaded data to gs://{self.bucket_name}/{filename} {'=' * 10}"
             )
@@ -114,7 +120,6 @@ class StorageController:
             return f"gs://{self.bucket_name}/{filename}"
 
         finally:
-            # Clean up the temporary file
             if temp_file_path and temp_file_path.exists():
                 temp_file_path.unlink()
 
