@@ -10,9 +10,7 @@ from typing import Any
 
 from google.cloud import bigquery
 
-from brownllama.logger import get_logger
-
-logger = get_logger(__name__)
+from .logger import logger
 
 
 class BigqueryQuery:

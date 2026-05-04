@@ -24,10 +24,8 @@ from google.api_core.exceptions import GoogleAPIError, ServerError, ServiceUnava
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
 
-from brownllama.logger import get_logger
-from brownllama.storage import StorageController
-
-logger = get_logger(__name__)
+from .logger import logger
+from .storage import StorageController
 
 # Type variable for generic return
 T = TypeVar("T")

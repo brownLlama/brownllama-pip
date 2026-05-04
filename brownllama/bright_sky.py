@@ -9,9 +9,7 @@ Args:
 
 import requests
 
-from brownllama.logger import get_logger
-
-logger = get_logger(__name__)
+from .logger import logger
 
 
 class Weather:

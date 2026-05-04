@@ -17,9 +17,7 @@ import requests
 from google.cloud import storage
 from google.cloud.exceptions import GoogleCloudError, NotFound
 
-from brownllama.logger import get_logger
-
-logger = get_logger(__name__)
+from .logger import logger
 
 
 class StorageController:
