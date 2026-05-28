@@ -41,6 +41,7 @@ class BigqueryPayload(BaseModel):
         dataset_id (str): BigQuery dataset ID
         table_id (str): BigQuery table ID
         bucket_name (str | None): GCS bucket name for data staging
+        query (str | None): Query to be run in BigQuery
 
     """
 
@@ -48,6 +49,7 @@ class BigqueryPayload(BaseModel):
     dataset_id: str
     table_id: str
     bucket_name: str | None = None
+    query: str | None = None
 
 
 # Default configuration
