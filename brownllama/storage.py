@@ -11,13 +11,106 @@ import mimetypes
 import tempfile
 import uuid
 from pathlib import Path
+from typing import Any
 
+import numpy as np
 import pandas as pd
 import requests
 from google.cloud import storage
 from google.cloud.exceptions import GoogleCloudError, NotFound
 
 from .logger import logger
+
+
+def _json_default(value: Any) -> Any:
+    """
+    Fallback serializer for values json.dumps() cannot natively handle.
+
+    Handles pandas Timestamps and numpy scalar/array types that can appear
+    after a DataFrame round-trip via to_dict(orient="records").
+
+    Args:
+        value: The non-JSON-native value to convert.
+
+    Returns:
+        A JSON-serializable representation of the value.
+
+    """
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.floating):
+        return float(value)
+    if isinstance(value, np.bool_):
+        return bool(value)
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    return str(value)
+
+
+def _clean_value(value: Any) -> Any:
+    """
+    Recursively replace missing scalar values (NaN/NaT/None) with None.
+
+    Mirrors pandas.DataFrame.to_json()'s behavior of converting NaN/NaT to
+    JSON null, since json.dumps() would otherwise emit the invalid JSON
+    token NaN for float('nan'). Lists and dicts are recursed into; other
+    values are returned unchanged.
+
+    Args:
+        value: The value to clean. Can be a scalar, list, or dict.
+
+    Returns:
+        The cleaned value, with any missing scalar replaced by None.
+
+    """
+    if isinstance(value, dict):
+        return {key: _clean_value(val) for key, val in value.items()}
+    if isinstance(value, list):
+        return [_clean_value(val) for val in value]
+
+    try:
+        is_missing = pd.isna(value)
+    except (TypeError, ValueError):
+        # pd.isna can raise or return an array for some inputs (e.g. certain
+        # objects); treat those as "not missing" rather than fail the export.
+        return value
+
+    if isinstance(is_missing, bool) and is_missing:
+        return None
+    return value
+
+
+def _dataframe_to_ndjson(dataframe_data: pd.DataFrame) -> str:
+    """
+    Convert a DataFrame to a newline-delimited JSON string.
+
+    Uses Python's native json module instead of pandas.DataFrame.to_json(),
+    because pandas' underlying encoder corrupts astral-plane Unicode
+    characters (e.g. emoji above U+FFFF), turning them into invalid
+    surrogate pairs that later decode as the replacement character (U+FFFD).
+
+    Missing values (NaN/NaT/None) are converted to JSON null, matching
+    to_json()'s behavior. Non-JSON-native types (Timestamps, numpy scalars)
+    are converted via _json_default.
+
+    Args:
+        dataframe_data: The DataFrame to serialize.
+
+    Returns:
+        A string with one JSON object per line, ready for
+        NEWLINE_DELIMITED_JSON loading into BigQuery.
+
+    """
+    records = dataframe_data.to_dict(orient="records")
+    lines = []
+    for record in records:
+        clean_record = {key: _clean_value(val) for key, val in record.items()}
+        lines.append(
+            json.dumps(clean_record, ensure_ascii=False, default=_json_default)
+        )
+    return "\n".join(lines)
 
 
 class StorageController:
@@ -92,7 +185,8 @@ class StorageController:
                 suffix=".json",
                 encoding="utf-8",
             ) as temp_file:
-                dataframe_data.to_json(temp_file.name, orient="records", lines=True)
+                ndjson_content = _dataframe_to_ndjson(dataframe_data)
+                temp_file.write(ndjson_content)
                 temp_file_path = Path(temp_file.name)  # Changed to Path object
 
             # Upload the file to GCS
